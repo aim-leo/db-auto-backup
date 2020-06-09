@@ -313,14 +313,14 @@ function dump() {
   log "Begin dump file"
   if [[ -z "${DOCKER_CONATINER}" ]]; then
     log "Use local mongodump cmd"
-    mongodump=$(which mongodump)
+    local mongodump=$(which mongodump)
     check_cmd $mongodump
 
     $mongodump -h $DOCKER_URI -d $DATABASE -o $FILE_PATH || exit 1
   else
     log "Use docker mongodump cmd"
 
-    docker=$(which docker)
+    local docker=$(which docker)
     check_cmd $docker
 
     log "Begin exec dump cmd in docker"
@@ -337,25 +337,25 @@ function clean() {
   if [[ ! -z "${MAX_FILE}" ]]; then
     log "Begin clean redundant file"
 
-    COUNT=$(ls $OUTPUT_DIR -tr | $grep $DATABASE"_db" | wc -l)
+    local count=$(ls $OUTPUT_DIR -tr | $grep $DATABASE"_db" | wc -l)
 
-    log "There is $COUNT db file at $OUTPUT_DIR, max file is $MAX_FILE"
+    log "There is $count db file at $OUTPUT_DIR, max file is $MAX_FILE"
 
-    if [ "$MAX_FILE" -lt "$COUNT" ]; then
-      NAMES=$(ls $OUTPUT_DIR -tr | $grep $DATABASE)
-      LIST=(${NAMES/ /})
+    if [ "$MAX_FILE" -lt "$count" ]; then
+      local names=$(ls $OUTPUT_DIR -tr | $grep $DATABASE"_db")
+      local list=(${names/ /})
 
-      OVERFLOW_NUM=$(expr $COUNT - $MAX_FILE)
+      local overflow_num=$(expr $count - $MAX_FILE)
 
-      log "Should rm $OVERFLOW_NUM of dir: $OUTPUT_DIR"
+      log "Should rm $overflow_num of dir: $OUTPUT_DIR"
 
-      INDEX=0
-      for i in ${LIST[@]}; do
-        if [ "$INDEX" -lt "$OVERFLOW_NUM" ]; then
+      local index=0
+      for i in ${list[@]}; do
+        if [ "$index" -lt "$overflow_num" ]; then
           log "rm file: $OUTPUT_DIR/$i"
           $rm -rf $OUTPUT_DIR/$i
 
-          let INDEX+=1
+          let index+=1
         fi
       done
     fi
@@ -390,7 +390,7 @@ function push() {
     log "Begin push to origin/master"
     $git push $remote $git_branch >>${LOG_DIR}/backup.log || exit 1
     # reset head to origin/master
-    $git push origin master
+    $git push origin $git_branch
     log "Push file complete"
   fi
 }

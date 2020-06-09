@@ -2,7 +2,7 @@ database: qt
 docker_uri: localhost:27017
 docker_container: mongo
 output_dir: /media/aimleo/MONG/workGit/qt-db-backup
-max_file: 30
+max_file: 5
 push2git: true
 gzip: true
 git:

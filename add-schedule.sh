@@ -1,22 +1,37 @@
 #!/usr/bin/bash
-PWD=/usr/bin/pwd
-ECHO=/usr/bin/echo
+echo=$(which echo)
+pwd=$(which pwd)
+test=$(which test)
+sed=$(which sed)
+tail=$(which tail)
+readlink=$(which readlink)
 
-CURRENT=$($PWD)
-WHOAMI=$(/usr/bin/whoami)
+current=$($pwd)
+whoami=$(/usr/bin/whoami)
+target=/etc/crontab
 
-FLAG="added-db-backup-schedule"
-
-echo $FLAG
-
-ADDED_FLAG=$(tail /etc/crontab | grep $FLAG)
-
-if [[ ! -z "${ADDED_FLAG}" ]]; then
-  $ECHO "you have added $FLAG to /etc/crontab, skipping"
-  exit 0
+# User should be root
+if [ $USER != "root" ]; then
+  $echo "Should be run as root"
+  exit 1;
 fi
 
-$ECHO "* * * * * ${WHOAMI} /usr/bin/bash ${CURRENT}/backup-qt.sh && $ECHO $FLAG" >> /etc/crontab || exit 1
+if $test ! -f "$1"; then
+  $echo "Yaml file unexsist!"
+  $echo "Usage: bash add-schedule.sh [yaml]"
+  exit 1
+fi
+
+YAML_PATH=`$readlink -f $1`
+
+ADDED_FLAG=`$tail $target | grep $1`
+
+if [[ ! -z "${ADDED_FLAG}" ]]; then
+  $echo "you have added $FLAG to /etc/crontab, replacing"
+  $sed -i "/$1/d" $target
+fi
+
+$echo "* * * * * ${whoami} /usr/bin/bash ${current}/mongo-backup.sh -f $YAML_PATH" >> $target || exit 1
 
 service cron reload
 

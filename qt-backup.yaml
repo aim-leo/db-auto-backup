@@ -1,0 +1,14 @@
+database: qt
+docker_uri: localhost:27017
+docker_container: mongo
+output_dir: /media/aimleo/MONG/workGit/qt-db-backup
+max_file: 30
+push2git: true
+gzip: true
+git:
+  user:
+    name: aim-leo
+    email: luozewei123@qq.com
+    pwd: lzw20075877016
+  remote: gitee.com/aim-leo/qt-db-backup.git
+  branch: master

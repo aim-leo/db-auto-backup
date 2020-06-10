@@ -13,11 +13,13 @@ chmod=$(which chmod)
 grep=$(which grep)
 eval=$(which eval)
 readlink=$(which readlink)
+touch=$(which touch)
 
 TIME=$(date "+%Y-%m-%d_%H-%M-%S")
+DAY=$(date "+%Y-%m-%d")
 CURRENT=$($pwd)
 PARENT_DIR="cd $CURRENT/.. && $pwd"
-VERSION="1.0.2"
+VERSION="1.0.3"
 
 function usage() {
   $echo "Usage:"
@@ -60,17 +62,30 @@ function version() {
 function log() {
   FORMAT_TIME=$(date "+%Y-%m-%d %H:%M:%S")
   $echo "$FORMAT_TIME [MONGO-BACKUP] $1"
-  if $test -f ${LOG_DIR}/backup.log; then
-    $echo "$FORMAT_TIME [MONGO-BACKUP] $1" >>${LOG_DIR}/backup.log
+  if $test ! -z $LOG_PATH && $test -f $LOG_PATH; then
+    $echo "$FORMAT_TIME [MONGO-BACKUP] $1" >>$LOG_PATH
+  else
+    $echo "$FORMAT_TIME [MONGO-BACKUP] $1" >>/tmp/db-backup/tmp.log
   fi
 }
 
 function ensure_dir() {
-  if ! $test -d "$1"; then
+  if $test ! -d "$1"; then
     log "ensure_dir: $1 unexist, try to create it"
     $mkdir $1 || echo 'mkdir fail'
     $chmod 777 $1 || echo 'chmod fail'
-    ls $1
+  fi
+}
+
+function ensure_file() {
+  local file_path=$1"/"$2
+  if $test ! -f "$file_path"; then
+    log "ensure_file: $2 unexist at $1, try to create it"
+
+    ensure_dir $1
+
+    $touch $file_path || echo 'touch fail'
+    $chmod 777 $file_path || echo 'chmod fail'
   fi
 }
 
@@ -142,6 +157,7 @@ function parse_yaml() {
         -e '/\-.*=/s|\-|_|'
   ) <"$yaml_file"
 }
+
 function create_variables() {
   local yaml_file="$1"
   eval "$(parse_yaml "$yaml_file")"
@@ -177,23 +193,23 @@ function parse_args() {
       DATABASE_PORT="$2"
       shift
       ;;
-    -e  | --git_user_name)
+    -e | --git_user_name)
       GIT_USER_NAME="$2"
       shift
       ;;
-    -w  | --git_user_pwd)
+    -w | --git_user_pwd)
       GIT_USER_PWD="$2"
       shift
       ;;
-    -i  | --git_user_email)
+    -i | --git_user_email)
       GIT_USER_EMAIL="$2"
       shift
       ;;
-    -r  | --git_remote)
+    -r | --git_remote)
       GIT_REMOTE="$2"
       shift
       ;;
-    -b  | --git_branch)
+    -b | --git_branch)
       GIT_BRANCH="$2"
       shift
       ;;
@@ -239,12 +255,12 @@ function parse_args() {
   YAML_PATH=${YAML_PATH:-$OUTPUT_DIR"/backup.yaml"}
   YAML_PATH=$($readlink -f $YAML_PATH)
 
-  log "yaml path:"$YAML_PATH
+  $echo "Yaml path: $YAML_PATH"
 
   # first, parse the yaml config
   # the addtional option will replace the yaml config
   if $test -f "$YAML_PATH"; then
-    log "Parsing yaml file at $YAML_PATH"
+    $echo "Parsing yaml file at $YAML_PATH"
 
     create_variables $YAML_PATH
 
@@ -268,7 +284,7 @@ function parse_args() {
     GZIP=${GZIP:-$gzip}
 
     OUTPUT_DIR=${OUTPUT_DIR:-$output_dir}
-    LOG_DIR=${OUTPUT_DIR:-$log_dir}
+    LOG_DIR=${LOG_DIR:-$log_dir}
   fi
 
   # assign default params
@@ -282,6 +298,7 @@ function parse_args() {
   OUTPUT_DIR=${OUTPUT_DIR:-$CURRENT}
 
   FILE_NAME=${FILE_NAME:-$DATABASE_NAME"_db_"$TIME}
+  LOG_PATH=${LOG_DIR}"/backup-$DAY.log"
 
   # assign default db host
   if $test "mongo" == "$DATABASE_TYPE"; then
@@ -291,6 +308,20 @@ function parse_args() {
     FILE_NAME="$FILE_NAME.sql"
   fi
 
+  # make sure out dir exsit
+  ensure_dir $OUTPUT_DIR
+  # make sure log dir exsit
+  ensure_dir $LOG_DIR
+
+  # tran to absolute path
+  OUTPUT_DIR=$(cd $OUTPUT_DIR && $pwd)
+  LOG_DIR=$(cd $LOG_DIR && $pwd)
+
+  FILE_PATH=$OUTPUT_DIR/$FILE_NAME
+
+  ensure_file $LOG_DIR backup-$DAY.log
+
+  log "-----------------------------------------START SPLIT LINE-----------------------------------------------"
   log "config.DATABASE_NAME>> "$DATABASE_NAME
   log "config.DATABASE_TYPE>> "$DATABASE_TYPE
   log "config.DATABASE_USER>> "$DATABASE_USER
@@ -305,19 +336,8 @@ function parse_args() {
   log "config.GIT_USER_PWD>> "$GIT_USER_PWD
   log "config.GIT_REMOTE>> "$remote
   log "config.OUTPUT_DIR>> "$OUTPUT_DIR
-  log "config.LOG_DIR>> "$LOG_DIR
+  log "config.LOG_PATH>> "$LOG_PATH
   log "config.FILE_NAME>> "$FILE_NAME
-
-  # make sure out dir exsit
-  ensure_dir $OUTPUT_DIR
-  # make sure log dir exsit
-  ensure_dir $LOG_DIR
-
-  # tran to absolute path
-  OUTPUT_DIR=$(cd $OUTPUT_DIR && $pwd)
-  LOG_DIR=$(cd $LOG_DIR && $pwd)
-
-  FILE_PATH=$OUTPUT_DIR/$FILE_NAME
 
   # if set push2git to true, set git
   set_git
@@ -388,7 +408,7 @@ function dump() {
 function mongo_dump() {
   log "Begin dump mongodb file"
 
-  local database_address = $DATABASE_HOST":"$DATABASE_PORT
+  local database_address=$DATABASE_HOST":"$DATABASE_PORT
 
   if [[ -z "${DOCKER_CONATINER}" ]]; then
     log "Use local mongodump cmd"
@@ -403,11 +423,11 @@ function mongo_dump() {
     check_cmd $docker
 
     log "Begin exec dump cmd in docker"
-    $docker exec $DOCKER_CONATINER /bin/bash -c "/usr/bin/mongodump -h $database_address -d $DATABASE_NAME -o /tmp/$FILE_NAME" >>${LOG_DIR}/backup.log || exit 1
+    $docker exec $DOCKER_CONATINER /bin/bash -c "/usr/bin/mongodump -h $database_address -d $DATABASE_NAME -o /tmp/$FILE_NAME" >>$LOG_PATH || exit 1
     log "Begin cp file out of docker"
-    $docker cp $DOCKER_CONATINER:/tmp/$FILE_NAME $OUTPUT_DIR >>${LOG_DIR}/backup.log || exit 1
+    $docker cp $DOCKER_CONATINER:/tmp/$FILE_NAME $OUTPUT_DIR >>$LOG_PATH || exit 1
     log "Begin rm useless dump file in docker"
-    $docker exec $DOCKER_CONATINER rm -rf /tmp/$FILE_NAME >>${LOG_DIR}/backup.log || exit 1
+    $docker exec $DOCKER_CONATINER rm -rf /tmp/$FILE_NAME >>$LOG_PATH || exit 1
   fi
   log "Dump file complete"
 }
@@ -430,7 +450,7 @@ function mysql_dump() {
     local mysqldump=$(which mysqldump)
     check_cmd $mysqldump
 
-    $mysqldump -h$DATABASE_HOST -P$DATABASE_PORT -u$DATABASE_USER -p$DATABASE_PWD $DATABASE_NAME > $FILE_PATH || exit 1
+    $mysqldump -h$DATABASE_HOST -P$DATABASE_PORT -u$DATABASE_USER -p$DATABASE_PWD $DATABASE_NAME >$FILE_PATH || exit 1
   else
     log "Use docker mysqldump cmd"
 
@@ -438,11 +458,11 @@ function mysql_dump() {
     check_cmd $docker
 
     log "Begin exec dump cmd in docker"
-    $docker exec $DOCKER_CONATINER bash -c "/usr/bin/mysqldump -h$DATABASE_HOST -P$DATABASE_PORT -u$DATABASE_USER -p$DATABASE_PWD $DATABASE_NAME > /tmp/$FILE_NAME" >>${LOG_DIR}/backup.log || exit 1
+    $docker exec $DOCKER_CONATINER bash -c "/usr/bin/mysqldump -h$DATABASE_HOST -P$DATABASE_PORT -u$DATABASE_USER -p$DATABASE_PWD $DATABASE_NAME > /tmp/$FILE_NAME" >>$LOG_PATH || exit 1
     log "Begin cp file out of docker"
-    $docker cp $DOCKER_CONATINER:/tmp/$FILE_NAME $OUTPUT_DIR >>${LOG_DIR}/backup.log || exit 1
+    $docker cp $DOCKER_CONATINER:/tmp/$FILE_NAME $OUTPUT_DIR >>$LOG_PATH || exit 1
     log "Begin rm useless dump file in docker"
-    $docker exec $DOCKER_CONATINER rm -rf /tmp/$FILE_NAME >>${LOG_DIR}/backup.log || exit 1
+    $docker exec $DOCKER_CONATINER rm -rf /tmp/$FILE_NAME >>$LOG_PATH || exit 1
   fi
   log "Dump file complete"
 }
@@ -496,13 +516,13 @@ function push() {
     cd $OUTPUT_DIR
 
     log "Pulling all commit at this dir"
-    $git pull $remote $GIT_BRANCH >>${LOG_DIR}/backup.log
+    $git pull $remote $GIT_BRANCH >>$LOG_PATH
     log "Adding all change at this dir"
-    $git add . >>${LOG_DIR}/backup.log || exit 1
+    $git add . >>$LOG_PATH || exit 1
     log "Adding a commit"
-    $git commit -m "conventional commit $TIME" >>${LOG_DIR}/backup.log || exit 1
+    $git commit -m "conventional commit $TIME" >>$LOG_PATH || exit 1
     log "Begin push to origin/master"
-    $git push $remote $GIT_BRANCH >>${LOG_DIR}/backup.log || exit 1
+    $git push $remote $GIT_BRANCH >>$LOG_PATH || exit 1
     # reset head to origin/master
     $git push origin $GIT_BRANCH
     log "Push file complete"
@@ -518,12 +538,14 @@ function main() {
 
   push
 
-  log "Backup db success!"
+  log "Db file has placed at ${FILE_PATH}, log has echo to $LOG_PATH"
 
-  log "Db file will placed at ${FILE_PATH}, log has echo to ${LOG_DIR}/backup.log"
+  log "Backup db success!"
 
   exit 0
 }
+
+ensure_file /tmp/db-backup tmp.log
 
 parse_args "$@"
 main

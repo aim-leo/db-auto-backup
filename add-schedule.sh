@@ -7,6 +7,9 @@ sed=$(which sed)
 tail=$(which tail)
 readlink=$(which readlink)
 grep=$(which grep)
+dirname=$(which dirname)
+
+base_dir=`$dirname $0`
 
 current=$($pwd)
 whoami=$(/usr/bin/whoami)
@@ -42,7 +45,7 @@ if [[ ! -z "${ADDED_FLAG}" ]]; then
   $sed -i "/$FLAG/d" $target
 fi
 
-$echo "${CRON_SET} ${whoami} ${bash} ${current}/db-backup.sh -f $YAML_PATH && $echo $FLAG" >> $target || exit 1
+$echo "${CRON_SET} ${whoami} ${bash} ${base_dir}/db-backup.sh -f $YAML_PATH && $echo $FLAG" >> $target || exit 1
 
 cat /etc/crontab
 

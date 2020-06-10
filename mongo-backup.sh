@@ -21,21 +21,32 @@ VERSION="1.0.2"
 
 function usage() {
   $echo "Usage:"
-  $echo "  bash mongo-backup.sh -d [database] -o [output_dir] ..."
+  $echo "  bash db-backup.sh -d [database] -o [output_dir] ..."
   $echo ""
-  $echo "Required options:"
-  $echo "  -d | --database [database]            Input the database you want to dump(can also define it at yaml)"
+  $echo "Database options: (recommand define it at yaml)"
+  $echo "  -d | --database_name [name]           Input the database you want to dump(required)"
+  $echo "  -t | --database_type [type]           Input the database type, enum: [mysql, mongo]"
+  $echo "  -h | --database_host [host]           Input the database host, defalut localhost"
+  $echo "  -p | --database_port [port]           Input the database port, defalut { mysql: 3306, mongodb: 27017 }"
+  $echo "  -u | --database_user [user]           Input the database user, mysql is required, mongo is optional"
+  $echo "  -s | --database_pwd  [pwd]            Input the database pwd, mysql is required, mongo is optional"
+  $echo ""
+  $echo "Git options: (recommand define it at yaml, required when push2git set true)"
+  $echo "  -e | --git_user_name [name]           Input the git user name"
+  $echo "  -w | --git_user_pwd [pwd]             Input the git user pwd"
+  $echo "  -i | --git_user_email [email]         Input the git user email"
+  $echo "  -r | --git_remote [remote]            Input the git remote"
+  $echo "  -b | --git_branch [branch]            Input the git branch"
   $echo ""
   $echo "Optional options:"
   $echo "  -o | --output_dir [output_dir]        Input the dir you want to output the file, defalut current path"
-  $echo "  -f | --config_yaml [config_yaml]      Input the yaml path contain your config, defalut at output_dir/backup.config.yaml"
+  $echo "  -f | --config_yaml [config_yaml]      Input the yaml path contain your config, defalut at output_dir/backup.yaml"
   $echo "  -n | --file_name [filename]           Input the filename, default DATABASE_db_TIME"
-  $echo "  -l | --log_dir [log_dir]              Input the dir you want to output the log, defalut output_dir"
-  $echo "  -c | --docker_container [container]   If your mongo is runing at docker, Input the container ID or name here"
-  $echo "  -u | --docker_uri [uri]               Input the mongo uri, default is localhost:27017"
+  $echo "  -l | --log_dir [log_dir]              Input the dir you want to output the log, defalut /tmp/db-backup"
+  $echo "  -c | --docker_container [container]   If your database is runing at docker, Input the container ID or name here"
   $echo "  -m | --max_file [max_file]            Expect a Number, if backup file overflow, it will auto remove the oldest file"
-  $echo "  -p | --push2git                       Whether to auto add && commit && push to git, default false"
-  $echo "  -g | --gzip                           Whether to gzip the dir, default false"
+  $echo "  -g | --push2git                       Whether to auto add && commit && push to git, default false"
+  $echo "  -z | --gzip                           Whether to gzip the dir, default false"
   $echo ""
   $echo "Auxiliary options:"
   $echo "  -h | --help                           Get help"
@@ -51,8 +62,6 @@ function log() {
   $echo "$FORMAT_TIME [MONGO-BACKUP] $1"
   if $test -f ${LOG_DIR}/backup.log; then
     $echo "$FORMAT_TIME [MONGO-BACKUP] $1" >>${LOG_DIR}/backup.log
-  else
-    $echo "$FORMAT_TIME [MONGO-BACKUP] $1" >>/tmp/backup.log
   fi
 }
 
@@ -144,8 +153,48 @@ function parse_args() {
   # named args
   while [ "$1" != "" ]; do
     case "$1" in
-    -d | --database)
-      DATABASE="$2"
+    -d | --database_name)
+      DATABASE_NAME="$2"
+      shift
+      ;;
+    -t | --database_type)
+      DATABASE_TYPE="$2"
+      shift
+      ;;
+    -u | --database_user)
+      DATABASE_USER="$2"
+      shift
+      ;;
+    -s | --database_pwd)
+      DATABASE_PWD="$2"
+      shift
+      ;;
+    -h | --database_host)
+      DATABASE_HOST="$2"
+      shift
+      ;;
+    -p | --database_port)
+      DATABASE_PORT="$2"
+      shift
+      ;;
+    -e  | --git_user_name)
+      GIT_USER_NAME="$2"
+      shift
+      ;;
+    -w  | --git_user_pwd)
+      GIT_USER_PWD="$2"
+      shift
+      ;;
+    -i  | --git_user_email)
+      GIT_USER_EMAIL="$2"
+      shift
+      ;;
+    -r  | --git_remote)
+      GIT_REMOTE="$2"
+      shift
+      ;;
+    -b  | --git_branch)
+      GIT_BRANCH="$2"
       shift
       ;;
     -o | --output_dir)
@@ -168,16 +217,12 @@ function parse_args() {
       DOCKER_CONATINER="$2"
       shift
       ;;
-    -u | --docker_uri)
-      DOCKER_URI="$2"
-      shift
-      ;;
     -m | --max-file)
       MAX_FILE="$2"
       shift
       ;;
-    -p | --push2git) PUSH_TO_GIT=true ;;
-    -g | --gzip) GZIP=true ;;
+    -g | --push2git) PUSH_TO_GIT=true ;;
+    -z | --gzip) GZIP=true ;;
     -h | --help)
       usage
       exit
@@ -203,38 +248,62 @@ function parse_args() {
 
     create_variables $YAML_PATH
 
-    $echo $database
+    DATABASE_NAME=${DATABASE_NAME:-$database_name}
+    DATABASE_TYPE=${DATABASE_TYPE:-$database_type}
+    DATABASE_USER=${DATABASE_USER:-$database_user}
+    DATABASE_PWD=${DATABASE_PWD:-$database_pwd}
+    DATABASE_HOST=${DATABASE_HOST:-$database_host}
+    DATABASE_PORT=${DATABASE_PORT:-$database_port}
 
-    DATABASE=${DATABASE:-$database}
-    DOCKER_URI=${DOCKER_URI:-$docker_uri}
+    GIT_USER_NAME=${GIT_USER_NAME:-$git_user_name}
+    GIT_USER_PWD=${GIT_USER_PWD:-$git_user_pwd}
+    GIT_USER_EMAIL=${GIT_USER_EMAIL:-$git_user_email}
+    GIT_REMOTE=${GIT_REMOTE:-$git_remote}
+    GIT_BRANCH=${GIT_BRANCH:-$git_branch}
+
     DOCKER_CONATINER=${DOCKER_CONATINER:-$docker_container}
+
     MAX_FILE=${MAX_FILE:-$max_file}
     PUSH_TO_GIT=${PUSH_TO_GIT:-$push2git}
     GZIP=${GZIP:-$gzip}
-    MAX_FILE=${MAX_FILE:-$max_file}
+
     OUTPUT_DIR=${OUTPUT_DIR:-$output_dir}
+    LOG_DIR=${OUTPUT_DIR:-$log_dir}
   fi
 
   # assign default params
   GZIP=${GZIP:-false}
   PUSH_TO_GIT=${PUSH_TO_GIT:-false}
-  DOCKER_URI=${DOCKER_URI:-"localhost:27017"}
+  DATABASE_TYPE=${DATABASE_TYPE:-"mongo"}
+  DATABASE_HOST=${DATABASE_HOST:-"localhost"}
+  GIT_BRANCH=${GIT_BRANCH:-"master"}
+  LOG_DIR=${LOG_DIR:-"/tmp/db-backup"}
 
   OUTPUT_DIR=${OUTPUT_DIR:-$CURRENT}
-  LOG_DIR=${LOG_DIR:-$OUTPUT_DIR}
 
-  FILE_NAME=${FILE_NAME:-$DATABASE"_db_"$TIME}
+  FILE_NAME=${FILE_NAME:-$DATABASE_NAME"_db_"$TIME}
 
-  log "config.DATABASE>> "$DATABASE
-  log "config.DOCKER_URI>> "$DOCKER_URI
+  # assign default db host
+  if $test "mongo" == "$DATABASE_TYPE"; then
+    DATABASE_PORT=${DATABASE_PORT:-"27017"}
+  else
+    DATABASE_PORT=${DATABASE_PORT:-"3306"}
+    FILE_NAME="$FILE_NAME.sql"
+  fi
+
+  log "config.DATABASE_NAME>> "$DATABASE_NAME
+  log "config.DATABASE_TYPE>> "$DATABASE_TYPE
+  log "config.DATABASE_USER>> "$DATABASE_USER
+  log "config.DATABASE_PWD>> "$DATABASE_PWD
+  log "config.DATABASE_HOST>> "$DATABASE_HOST
   log "config.DOCKER_CONATINER>> "$DOCKER_CONATINER
   log "config.MAX_FILE>> "$MAX_FILE
   log "config.PUSH_TO_GIT>> "$PUSH_TO_GIT
   log "config.GZIP>>"$GZIP
-  log "config.git_user_name>> "$git_user_name
-  log "config.git_user_email>> "$git_user_email
-  log "config.git_user_pwd>> "$git_user_pwd
-  log "config.remote>> "$remote
+  log "config.GIT_USER_NAME>> "$GIT_USER_NAME
+  log "config.GIT_USER_EMAIL>> "$GIT_USER_EMAIL
+  log "config.GIT_USER_PWD>> "$GIT_USER_PWD
+  log "config.GIT_REMOTE>> "$remote
   log "config.OUTPUT_DIR>> "$OUTPUT_DIR
   log "config.LOG_DIR>> "$LOG_DIR
   log "config.FILE_NAME>> "$FILE_NAME
@@ -254,7 +323,7 @@ function parse_args() {
   set_git
 
   # check database
-  if [[ -z "${DATABASE}" ]]; then
+  if [[ -z "${DATABASE_NAME}" ]]; then
     log "Required database name, please input -d [database] or --database [database]"
     usage
     exit 1
@@ -276,47 +345,57 @@ function set_git() {
   if $PUSH_TO_GIT; then
     check_cmd $git
 
-    if [[ -z "${git_user_name}" ]]; then
+    if [[ -z "${GIT_USER_NAME}" ]]; then
       log "Expected a git user name"
       exit 1
     fi
 
-    if [[ -z "${git_user_email}" ]]; then
+    if [[ -z "${GIT_USER_PWD}" ]]; then
       log "Expected a git user email"
       exit 1
     fi
 
-    if [[ -z "${git_user_pwd}" ]]; then
+    if [[ -z "${GIT_USER_EMAIL}" ]]; then
       log "Expected a git user pwd"
       exit 1
     fi
 
-    if [[ -z "${git_remote}" ]]; then
+    if [[ -z "${GIT_REMOTE}" ]]; then
       log "Expected a git remote"
       exit 1
     fi
 
-    remote="https://$git_user_name:$git_user_pwd@$git_remote"
-    git_branch=${git_branch:-"master"}
+    remote="https://$GIT_USER_NAME:$GIT_USER_PWD@$GIT_REMOTE"
 
     log "Checking weather the dir is a git dir"
     ensure_git_dir $OUTPUT_DIR
 
     cd $OUTPUT_DIR
     log "Setting git user config"
-    $git config user.name $git_user_name
-    $git config user.email $git_user_email
+    $git config user.name $GIT_USER_NAME
+    $git config user.email $GIT_USER_EMAIL
   fi
 }
 
 function dump() {
-  log "Begin dump file"
+  if $test "mongo" == "$DATABASE_TYPE"; then
+    mongo_dump
+  else
+    mysql_dump
+  fi
+}
+
+function mongo_dump() {
+  log "Begin dump mongodb file"
+
+  local database_address = $DATABASE_HOST":"$DATABASE_PORT
+
   if [[ -z "${DOCKER_CONATINER}" ]]; then
     log "Use local mongodump cmd"
     local mongodump=$(which mongodump)
     check_cmd $mongodump
 
-    $mongodump -h $DOCKER_URI -d $DATABASE -o $FILE_PATH || exit 1
+    $mongodump -h $database_address -d $DATABASE_NAME -o $FILE_PATH || exit 1
   else
     log "Use docker mongodump cmd"
 
@@ -324,7 +403,42 @@ function dump() {
     check_cmd $docker
 
     log "Begin exec dump cmd in docker"
-    $docker exec $DOCKER_CONATINER /bin/bash -c "/usr/bin/mongodump -h $DOCKER_URI -d $DATABASE -o /tmp/$FILE_NAME" >>${LOG_DIR}/backup.log || exit 1
+    $docker exec $DOCKER_CONATINER /bin/bash -c "/usr/bin/mongodump -h $database_address -d $DATABASE_NAME -o /tmp/$FILE_NAME" >>${LOG_DIR}/backup.log || exit 1
+    log "Begin cp file out of docker"
+    $docker cp $DOCKER_CONATINER:/tmp/$FILE_NAME $OUTPUT_DIR >>${LOG_DIR}/backup.log || exit 1
+    log "Begin rm useless dump file in docker"
+    $docker exec $DOCKER_CONATINER rm -rf /tmp/$FILE_NAME >>${LOG_DIR}/backup.log || exit 1
+  fi
+  log "Dump file complete"
+}
+
+function mysql_dump() {
+  log "Begin dump mysql file"
+  log "Checking mysql user"
+
+  if [[ -z "${DATABASE_USER}" ]]; then
+    log "Please input you mysql user name"
+    exit 1
+  fi
+
+  if [[ -z "${DATABASE_PWD}" ]]; then
+    log "Please input you mysql user pwd"
+    exit 1
+  fi
+
+  if [[ -z "${DOCKER_CONATINER}" ]]; then
+    local mysqldump=$(which mysqldump)
+    check_cmd $mysqldump
+
+    $mysqldump -h$DATABASE_HOST -P$DATABASE_PORT -u$DATABASE_USER -p$DATABASE_PWD $DATABASE_NAME > $FILE_PATH || exit 1
+  else
+    log "Use docker mysqldump cmd"
+
+    local docker=$(which docker)
+    check_cmd $docker
+
+    log "Begin exec dump cmd in docker"
+    $docker exec $DOCKER_CONATINER bash -c "/usr/bin/mysqldump -h$DATABASE_HOST -P$DATABASE_PORT -u$DATABASE_USER -p$DATABASE_PWD $DATABASE_NAME > /tmp/$FILE_NAME" >>${LOG_DIR}/backup.log || exit 1
     log "Begin cp file out of docker"
     $docker cp $DOCKER_CONATINER:/tmp/$FILE_NAME $OUTPUT_DIR >>${LOG_DIR}/backup.log || exit 1
     log "Begin rm useless dump file in docker"
@@ -337,12 +451,12 @@ function clean() {
   if [[ ! -z "${MAX_FILE}" ]]; then
     log "Begin clean redundant file"
 
-    local count=$(ls $OUTPUT_DIR -tr | $grep $DATABASE"_db" | wc -l)
+    local count=$(ls $OUTPUT_DIR -tr | $grep $DATABASE_NAME"_db" | wc -l)
 
     log "There is $count db file at $OUTPUT_DIR, max file is $MAX_FILE"
 
     if [ "$MAX_FILE" -lt "$count" ]; then
-      local names=$(ls $OUTPUT_DIR -tr | $grep $DATABASE"_db")
+      local names=$(ls $OUTPUT_DIR -tr | $grep $DATABASE_NAME"_db")
       local list=(${names/ /})
 
       local overflow_num=$(expr $count - $MAX_FILE)
@@ -382,15 +496,15 @@ function push() {
     cd $OUTPUT_DIR
 
     log "Pulling all commit at this dir"
-    $git pull $remote $git_branch >>${LOG_DIR}/backup.log
+    $git pull $remote $GIT_BRANCH >>${LOG_DIR}/backup.log
     log "Adding all change at this dir"
     $git add . >>${LOG_DIR}/backup.log || exit 1
     log "Adding a commit"
     $git commit -m "conventional commit $TIME" >>${LOG_DIR}/backup.log || exit 1
     log "Begin push to origin/master"
-    $git push $remote $git_branch >>${LOG_DIR}/backup.log || exit 1
+    $git push $remote $GIT_BRANCH >>${LOG_DIR}/backup.log || exit 1
     # reset head to origin/master
-    $git push origin $git_branch
+    $git push origin $GIT_BRANCH
     log "Push file complete"
   fi
 }

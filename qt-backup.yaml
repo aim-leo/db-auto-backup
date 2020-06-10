@@ -1,10 +1,15 @@
-database: qt
-docker_uri: localhost:27017
-docker_container: mongo
-output_dir: /media/aimleo/MONG/workGit/qt-db-backup
+database:
+  type: mysql
+  name: codegeek
+  user: root
+  pwd: 123456-abc
+  host: localhost
+  port: 3306
+docker_container: mysql
+output_dir: /media/aimleo/MONG/workGit/db-auto-backup/test-mysql
 max_file: 5
-push2git: true
-gzip: true
+push2git: false
+gzip: false
 git:
   user:
     name: aim-leo

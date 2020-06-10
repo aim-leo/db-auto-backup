@@ -6,6 +6,7 @@ test=$(which test)
 sed=$(which sed)
 tail=$(which tail)
 readlink=$(which readlink)
+grep=$(which grep)
 
 current=$($pwd)
 whoami=$(/usr/bin/whoami)
@@ -25,7 +26,9 @@ fi
 
 YAML_PATH=`$readlink -f $1`
 
-ADDED_FLAG=`$tail $target | grep $1`
+FLAG=${YAML_PATH//\//\_}
+
+ADDED_FLAG=`$tail $target | $grep $FLAG`
 
 # run it at each hours, 00:05 01:05 ...
 CRON_SET="5 * * * *"
@@ -35,11 +38,11 @@ if [[ ! -z "$2" ]]; then
 fi
 
 if [[ ! -z "${ADDED_FLAG}" ]]; then
-  $echo "you have added $1 to /etc/crontab, replacing"
-  $sed -i "/$1/d" $target
+  $echo "you have added $YAML_PATH to /etc/crontab, replacing"
+  $sed -i "/$FLAG/d" $target
 fi
 
-$echo "${CRON_SET} ${whoami} ${bash} ${current}/db-backup.sh -f $YAML_PATH" >> $target || exit 1
+$echo "${CRON_SET} ${whoami} ${bash} ${current}/db-backup.sh -f $YAML_PATH && $echo $FLAG" >> $target || exit 1
 
 cat /etc/crontab
 

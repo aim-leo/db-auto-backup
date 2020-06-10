@@ -31,7 +31,7 @@ if [[ ! -z "${ADDED_FLAG}" ]]; then
   $sed -i "/$1/d" $target
 fi
 
-$echo "* * * * * ${whoami} /usr/bin/bash ${current}/mongo-backup.sh -f $YAML_PATH" >> $target || exit 1
+$echo "* * * * * ${whoami} /usr/bin/bash ${current}/db-backup.sh -f $YAML_PATH" >> $target || exit 1
 
 service cron reload
 

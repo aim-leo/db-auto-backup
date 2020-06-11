@@ -61,11 +61,11 @@ function version() {
 
 function log() {
   FORMAT_TIME=$(date "+%Y-%m-%d %H:%M:%S")
-  $echo "$FORMAT_TIME [MONGO-BACKUP] $1"
+  $echo "$FORMAT_TIME [MONGO-BACKUP] $*"
   if $test ! -z $LOG_PATH && $test -f $LOG_PATH; then
-    $echo "$FORMAT_TIME [MONGO-BACKUP] $1" >>$LOG_PATH
+    $echo "$FORMAT_TIME [MONGO-BACKUP] $*" >>$LOG_PATH
   else
-    $echo "$FORMAT_TIME [MONGO-BACKUP] $1" >>/tmp/db-backup/tmp.log
+    $echo "$FORMAT_TIME [MONGO-BACKUP] $*" >>/tmp/db-backup/tmp.log
   fi
 }
 
@@ -108,7 +108,7 @@ function ensure_git_dir() {
 
     cd ..
     # $rm -rf $1
-    $git clone $remote $1
+    $git clone $GIT_REMOTE $1
     cd $1
   fi
 
@@ -365,35 +365,48 @@ function set_git() {
   if $PUSH_TO_GIT; then
     check_cmd $git
 
-    if [[ -z "${GIT_USER_NAME}" ]]; then
-      log "Expected a git user name"
-      exit 1
-    fi
+    is_ssh_git=`$echo $GIT_REMOTE | $grep @`
 
-    if [[ -z "${GIT_USER_PWD}" ]]; then
-      log "Expected a git user email"
-      exit 1
-    fi
+    # if not a ssh git, must define the user name & pwd
+    if [[ -z "${is_ssh_git}" ]]; then
+      if [[ -z "${GIT_USER_NAME}" ]]; then
+        log "Expected a git user name"
+        exit 1
+      fi
 
-    if [[ -z "${GIT_USER_EMAIL}" ]]; then
-      log "Expected a git user pwd"
-      exit 1
-    fi
+      if [[ -z "${GIT_USER_PWD}" ]]; then
+        log "Expected a git user email"
+        exit 1
+      fi
 
-    if [[ -z "${GIT_REMOTE}" ]]; then
-      log "Expected a git remote"
-      exit 1
-    fi
+      if [[ -z "${GIT_USER_EMAIL}" ]]; then
+        log "Expected a git user pwd"
+        exit 1
+      fi
 
-    remote="https://$GIT_USER_NAME:$GIT_USER_PWD@$GIT_REMOTE"
+      if [[ -z "${GIT_REMOTE}" ]]; then
+        log "Expected a git remote"
+        exit 1
+      fi
+
+      # replace http https
+      GIT_REMOTE=`$echo $GIT_REMOTE | sed "s/https\?:\/\///g"`
+      GIT_REMOTE="https://$GIT_USER_NAME:$GIT_USER_PWD@$GIT_REMOTE"
+    fi
 
     log "Checking weather the dir is a git dir"
     ensure_git_dir $OUTPUT_DIR
 
     cd $OUTPUT_DIR
-    log "Setting git user config"
-    $git config user.name $GIT_USER_NAME
-    $git config user.email $GIT_USER_EMAIL
+    if [[ ! -z "${GIT_USER_NAME}" ]]; then
+      log "Setting git user name to "$GIT_USER_NAME
+      $git config user.name $GIT_USER_NAME
+    fi
+
+    if [[ ! -z "${GIT_USER_EMAIL}" ]]; then
+      log "Setting git user email to "$GIT_USER_EMAIL
+      $git config user.email $GIT_USER_EMAIL
+    fi
   fi
 }
 
@@ -471,13 +484,14 @@ function clean() {
   if [[ ! -z "${MAX_FILE}" ]]; then
     log "Begin clean redundant file"
 
-    local count=$(ls $OUTPUT_DIR -tr | $grep $DATABASE_NAME"_db" | wc -l)
+    local count=$(ls $OUTPUT_DIR | $grep $DATABASE_NAME"_db" | wc -l)
 
     log "There is $count db file at $OUTPUT_DIR, max file is $MAX_FILE"
 
     if [ "$MAX_FILE" -lt "$count" ]; then
-      local names=$(ls $OUTPUT_DIR -tr | $grep $DATABASE_NAME"_db")
+      local names=$(ls $OUTPUT_DIR | $grep $DATABASE_NAME"_db")
       local list=(${names/ /})
+      log $list
 
       local overflow_num=$(expr $count - $MAX_FILE)
 
@@ -502,10 +516,11 @@ function compress() {
   if $GZIP; then
     log "Begin compress file"
     cd $OUTPUT_DIR
-    log "Begin tar file: $FILE_PATH to $FILE_NAME.tar.gz, When you extract, Please use cmd: $tar -zxPf $FILE_NAME.tar.gz"
-    $tar -zcPf $FILE_NAME.tar.gz $FILE_PATH || exit 1
+    log "Begin tar file: $FILE_PATH to $FILE_NAME.tar.gz"
+    log "When you extract, Please use cmd: $tar -zxPf $FILE_NAME.tar.gz"
+    $tar -zcPf $FILE_NAME.tar.gz $FILE_PATH >>$LOG_PATH || exit 1
     log "Begin rm old file: $FILE_PATH"
-    $rm -rf $FILE_PATH || exit 1
+    $rm -rf $FILE_PATH>>$LOG_PATH || exit 1
     log "Compress file complete"
   fi
 }
@@ -515,7 +530,13 @@ function push() {
     log "Begin push file to git"
     cd $OUTPUT_DIR
 
-    log "Pulling all commit at this dir"
+    if [[ -z "$is_ssh_git" ]]; then
+      local remote=$GIT_REMOTE
+    else
+      local remote="origin"
+    fi
+
+    log "Pulling all commit at this dir, remote: "$remote
     $git pull $remote $GIT_BRANCH >>$LOG_PATH
     log "Adding all change at this dir"
     $git add . >>$LOG_PATH || exit 1
@@ -523,8 +544,6 @@ function push() {
     $git commit -m "conventional commit $TIME" >>$LOG_PATH || exit 1
     log "Begin push to origin/master"
     $git push $remote $GIT_BRANCH >>$LOG_PATH || exit 1
-    # reset head to origin/master
-    $git push origin $GIT_BRANCH
     log "Push file complete"
   fi
 }

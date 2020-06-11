@@ -10,6 +10,7 @@ grep=$(which grep)
 dirname=$(which dirname)
 
 base_dir=`$dirname $0`
+base_dir=`cd $base_dir && $pwd`
 
 current=$($pwd)
 whoami=$(/usr/bin/whoami)

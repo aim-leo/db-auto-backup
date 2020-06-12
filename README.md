@@ -3,41 +3,72 @@
 ## 备份脚本 db-backup.sh
 
 ### 用法
-bash db-backup.sh -d [database] -o [output_dir] ...
+
+#### 示例
+```
+// 将本地的mongodb数据库的test实例导出到/tmp/test-db-backup下
+bash db-backup.sh -d test -o /tmp/test-db-backup
+
+
+// 从名称为mysql的docker容器内导出test数据库.并压缩,到当前目录
+bash db-backup.sh -d test -t mysql -z
+
+// 使用yaml文件配置导出mysql下test数据库,并上传到对应的git
+bash db-backup.sh -f example.yaml
+
+// example.ymal
+database:
+  type: mysql
+  name: test
+  user: root
+  pwd: 123456-abc
+docker_container: mysql  // mysql在docker容器中,容器名是mysql
+output_dir: /tmp/test-db-backup
+max_file: 30    // 超过30个备份自动删除最开始的备份
+push2git: true  // 上传到git
+gzip: true   // 用tar压缩成.tar.gz文件
+git:
+  remote: git@github/***/***.git  // 你的git地址,需要在远程git上新建项目
+  branch: master
+
+```
+
+#### 所有参数
+
 ```
  Usage:
      bash db-backup.sh -d [database] -o [output_dir] ...
    
    Database options: (recommand define it at yaml)
-     -d | --database_name [name]           Input the database you want to dump(required)
+     -d | --database_name [name]                Input the database you want to dump(required)
      -t | --database_type [type]                Input the database type, enum: [mysql, mongo]
-     -h | --database_host [host]               Input the database host, defalut localhost
+     -h | --database_host [host]                Input the database host, defalut localhost
      -p | --database_port [port]                Input the database port, defalut { mysql: 3306, mongodb: 27017 }
-     -u | --database_user [user]              Input the database user, mysql is required, mongo is optional
-     -s | --database_pwd  [pwd]              Input the database pwd, mysql is required, mongo is optional
+     -u | --database_user [user]                Input the database user, mysql is required, mongo is optional
+     -s | --database_pwd  [pwd]                 Input the database pwd, mysql is required, mongo is optional
    
    Git options: (recommand define it at yaml, required when push2git set true)
-     -e | --git_user_name [name]           Input the git user name, required when use http protocol
-     -w | --git_user_pwd [pwd]               Input the git user pwd, required when use http protocol
-     -i | --git_user_email [email]             Input the git user email, required when use http protocol
+     -e | --git_user_name [name]                Input the git user name, required when use http protocol
+     -w | --git_user_pwd [pwd]                  Input the git user pwd, required when use http protocol
+     -i | --git_user_email [email]              Input the git user email, required when use http protocol
      -r | --git_remote [remote]                 Input the git remote, accept http | ssh protocol
-     -b | --git_branch [branch]                Input the git branch, default master
+     -b | --git_branch [branch]                 Input the git branch, default master
    
    Optional options:
-     -o | --output_dir [output_dir]           Input the dir you want to output the file, defalut current path
-     -f | --config_yaml [config_yaml]      Input the yaml path contain your config, defalut at output_dir/backup.yaml
-     -n | --file_name [filename]              Input the filename, default DATABASE_db_TIME
-     -l | --log_dir [log_dir]                       Input the dir you want to output the log, defalut /tmp/db-backup
-     -c | --docker_container [container] If your database is runing at docker, Input the container ID or name here
-     -m | --max_file [max_file]               Expect a Number, if backup file overflow, it will auto remove the oldest file
-     -g | --push2git                                Whether to auto add && commit && push to git, default false
-     -z | --gzip                                      Whether to gzip the dir, default false
+     -o | --output_dir [output_dir]             Input the dir you want to output the file, defalut current path
+     -f | --config_yaml [config_yaml]           Input the yaml path contain your config, defalut at output_dir/backup.yaml
+     -n | --file_name [filename]                Input the filename, default DATABASE_db_TIME
+     -l | --log_dir [log_dir]                   Input the dir you want to output the log, defalut /tmp/db-backup
+     -c | --docker_container [container]        If your database is runing at docker, Input the container ID or name here
+     -m | --max_file [max_file]                 Expect a Number, if backup file overflow, it will auto remove the oldest file
+     -g | --push2git                            Whether to auto add && commit && push to git, default false
+     -z | --gzip                                Whether to gzip the dir, default false
    
    Auxiliary options:
-     -h | --help                                     Get help
-     -v | --version                                Get current version
+     -h | --help                                Get help
+     -v | --version                             Get current version
 ```
-#### 基本参数
+#### 参数说明
 ##### -o | --output_dir [output_dir]
 - 作用: 指定要导出文件的路径
 - 必填: 使用cron自动备份时必填一个绝对路径,且确保该目录可写

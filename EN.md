@@ -1,10 +1,21 @@
 # db-backup documentation
 
+## Documentation
+- [中文](/README.md "中文")
+- [English](/EN.md "English")
+
+## Features
+- Support mysql and mongodb database
+- Support data export in local and Docker containers
+- Use ubuntu's built-in crontab cycle call to achieve regular backup
+- Configurable remote git address, regularly upload to remote server
+- Support tar compression
+- Configurable maximum number of backups, regularly clean the oldest backup
+- Import yaml configuration file
+
 ## Backup script db-backup.sh
 
-### Usage
-
-#### Example
+### Example
 ```
 // Export the test instance of the local mongodb database to /tmp/test-db-backup
 bash db-backup.sh -d test -o /tmp/test-db-backup
@@ -33,7 +44,7 @@ git:
 
 ```
 
-#### All parameters
+### All parameters
 
 ```
  Usage:
@@ -68,79 +79,79 @@ git:
      -h | --help                                Get help
      -v | --version                             Get current version
 ```
-#### Parameter Description
-##### -o | --output_dir [output_dir]
+### Parameter Description
+#### -o | --output_dir [output_dir]
 - Function: Specify the path of the file to be exported
 - Required: An absolute path is required when using cron for automatic backup, and make sure that the directory is writable
 - Default: When calling manually, the path of the current calling script is not specified
 
-##### -f | --config_yaml [config_yaml]
+#### -f | --config_yaml [config_yaml]
 - Function: Specify the yaml configuration file, it is recommended to use the yaml configuration method instead of specifying one by one
 - Required: Not required, but when -d --database_name is not used, a yaml file needs to be specified and the configuration of database_name needs to be included
 - Default: If not specified, the script will match the backup.yaml file in the export directory, if found, the configuration will be imported
 
-##### -n | --file_name [filename]
+#### -n | --file_name [filename]
 - Function: Specify the name of the exported file. It is not recommended to specify this item when using cron for regular backup
 - Required: Not required, and not recommended
 - Default: ${DATABASE_NAME}_db_${TIME} The default is a string containing the database name and time
 
-##### -l | --log_dir [log_dir]
+#### -l | --log_dir [log_dir]
 - Function: Specify the log path
 - Required: Not required
 - Default: By default, a log file named after the current day is created under /tmp/db-backup, but when the configuration is not read, the log will be output under /tmp/db-backup/tmp.log
 
-##### -c | --docker_container [container]
+#### -c | --docker_container [container]
 - Function: When the database is running in a docker container, specify the name or id of the container here
 - Required: Not required, when not filled, the default is to connect to the local database
 
-##### -m | --max_file [max_file]
+#### -m | --max_file [max_file]
 - Function: Specify the maximum number of exported files, the script will sort by file name, when the files in the directory are greater than this value, a certain number of files will be automatically deleted, which is why it is not recommended to customize the exported file name, because Used for sorting, making sure that the program deletes the oldest backup
 - Required: Not required, the number of documents is unlimited when not filled
 
-##### -g | --push2git
+#### -g | --push2git
 - Function: whether to automatically backup to git
 - Default: false
 
-##### -z | --gzip
+#### -z | --gzip
 - Function: Whether to use tar to compress the file. When this parameter is specified, the file will be compressed into NAME.tar.gz. When decompressing, please use tar -zxvPf NAME.tar.gz
 - Default: false
 
-##### -h | --help
+#### -h | --help
 - Function: Get help
 
-##### -v | --version
+#### -v | --version
 - Function: Get the current version
 
-#### Database related
-##### -d | --database_name [name]
+### Database related
+#### -d | --database_name [name]
 - Function: Specify the database to be backed up
 - Required: true (not required if specified in yaml)
 
-##### -t | --database_type [type]
+#### -t | --database_type [type]
 - Function: Specify the type of database to be backed up
 - Optional value: mongo mysql
 - Required: false
 - Default value: mongo
 
-##### -h | --database_host [host]
+#### -h | --database_host [host]
 - Function: Specify the database address to be backed up
 - Required: false
 - Default value: localhost
 
-##### -p | --database_port [port]
+#### -p | --database_port [port]
 - Function: Specify the database port to be backed up
 - Required: false
 - Default value: mysql: 3306 mongo: 27017
 
-##### -u | --database_user [user]
+#### -u | --database_user [user]
 - Function: Specify the database user name to be backed up
 - Required: Required when backing up the mysql database
 
-##### -s | --database_pwd [pwd]
+#### -s | --database_pwd [pwd]
 - Function: Specify the database password to be backed up
 - Required: Required when backing up the mysql database
 
-#### git options
+### git options
 When you specify the parameter -g, or --push2git, the script will transfer the backed up file to the specified git address. At this time, you need to specify the following parameters
 
 Note that when using cron to automatically run this script, git cannot obtain the current ssh-keygen, but it is normal when running the script manually.This is because cron runs the script as the root user, and ssh-key is saved in the current user ( May not be root),
@@ -149,23 +160,23 @@ The backup will fail at this time, and the available solutions are:
 - Specify the user's username, password and email in the script
 - Generate ssk-keygen under root and add to git server
 
-##### -e | --git_user_name [name]
+#### -e | --git_user_name [name]
 - Function: Specify git username
 - Required: Required when using https protocol
 
-##### -w | --git_user_pwd [pwd]
+#### -w | --git_user_pwd [pwd]
 - Function: Specify git password
 - Required: Required when using https protocol
 
-##### -i | --git_user_email [email]
+#### -i | --git_user_email [email]
 - Function: Specify git mailbox
 - Required: Required when using https protocol
 
-##### -r | --git_remote [remote]
+#### -r | --git_remote [remote]
 - Function: Specify git address
 - Required: Required when starting backup
 
-##### -b | --git_branch [branch]
+#### -b | --git_branch [branch]
 - Function: Specify git branch
 - Default value: master
 

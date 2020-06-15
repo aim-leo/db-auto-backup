@@ -1,10 +1,21 @@
 # db-backup说明文档
 
+## 文档
+- [中文](/README.md "中文")
+- [English](/EN.md "English")
+
+## 特性
+- 支持mysql和mongodb数据库
+- 支持本地和Docker容器内的数据导出
+- 使用ubuntu自带的crontab循环调用达到定时备份
+- 可配置远程git地址,定时上传到远程服务器
+- 支持tar压缩
+- 可配置最大备份数,定时清理最旧的备份
+- 可导入yaml配置文件
+
 ## 备份脚本 db-backup.sh
 
-### 用法
-
-#### 示例
+### 示例
 ```
 // 将本地的mongodb数据库的test实例导出到/tmp/test-db-backup下
 bash db-backup.sh -d test -o /tmp/test-db-backup
@@ -33,7 +44,7 @@ git:
 
 ```
 
-#### 所有参数
+### 所有参数
 
 ```
  Usage:
@@ -68,79 +79,78 @@ git:
      -h | --help                                Get help
      -v | --version                             Get current version
 ```
-#### 参数说明
-##### -o | --output_dir [output_dir]
+#### -o | --output_dir [output_dir]
 - 作用: 指定要导出文件的路径
 - 必填: 使用cron自动备份时必填一个绝对路径,且确保该目录可写
 - 默认: 当手动调用时,未指定则为当前调用脚本的路径
 
-##### -f | --config_yaml [config_yaml]
+#### -f | --config_yaml [config_yaml]
 - 作用: 指定yaml配置文件, 推荐使用yaml配置的方式而不是逐个指定
 - 必填: 非必填,但当未使用-d --database_name时,需要指定一个yaml文件,且需要包含database_name的配置
 - 默认: 如果未指定,脚本会在导出目录下匹配backup.yaml文件,如果找到将导入该配置
 
-##### -n | --file_name [filename]
+#### -n | --file_name [filename]
 - 作用: 指定导出的文件名,当使用cron定时备份时不推荐指定该项
 - 必填: 非必填, 且不推荐填写
 - 默认: ${DATABASE_NAME}_db_${TIME} 默认是包含数据库明和时间的字串
 
-##### -l | --log_dir [log_dir]
+#### -l | --log_dir [log_dir]
 - 作用: 指定日志路径
 - 必填: 非必填
 - 默认: 默认在/tmp/db-backup下创建一个以当天日期命名的log文件,但是当该配置未读取前,日志将会输出在/tmp/db-backup/tmp.log下
 
-##### -c | --docker_container [container]
+#### -c | --docker_container [container]
 - 作用: 当数据库运行在docker容器里时,在这里指定容器的name或者id
 - 必填: 非必填,当不填是默认连接本地数据库
 
-##### -m | --max_file [max_file]
+#### -m | --max_file [max_file]
 - 作用: 指定导出文件的最多数量,脚本会按照文件名称排序,当目录下的文件大于该值,会自动删除一定数量的文件,这也是为什么不推荐自定义导出的文件名的原因,因为要用于排序,确保程序删除的是最老的备份
 - 必填: 非必填,当不填写时文件数目无限制
 
-##### -g | --push2git
+#### -g | --push2git
 - 作用: 是否自动备份到git
 - 默认: false
 
-##### -z | --gzip
+#### -z | --gzip
 - 作用: 是否使用tar来压缩文件,当指定该参数,文件将会压缩成NAME.tar.gz, 解压缩时,请使用 tar -zxvPf NAME.tar.gz
 - 默认: false
 
-##### -h | --help
+#### -h | --help
 - 作用: 获取帮助
 
-##### -v | --version
+#### -v | --version
 - 作用: 获取当前版本
 
-#### 数据库相关
-##### -d | --database_name [name]
+### 数据库相关
+#### -d | --database_name [name]
 - 作用: 指定要备份的数据库
 - 必填: true(如果在yaml中指定了可不填)
 
-##### -t | --database_type [type]
+#### -t | --database_type [type]
 - 作用: 指定要备份的数据库类型
 - 可选值: mongo mysql
 - 必填: false
 - 默认值: mongo
 
-##### -h | --database_host [host]
+#### -h | --database_host [host]
 - 作用: 指定要备份的数据库地址
 - 必填: false
 - 默认值: localhost
 
-##### -p | --database_port [port]
+#### -p | --database_port [port]
 - 作用: 指定要备份的数据库端口
 - 必填: false
 - 默认值: mysql: 3306 mongo: 27017
 
-##### -u | --database_user [user]
+#### -u | --database_user [user]
 - 作用: 指定要备份的数据库用户名
 - 必填: 当备份mysql数据库时必填
 
-##### -s | --database_pwd  [pwd]
+#### -s | --database_pwd  [pwd]
 - 作用: 指定要备份的数据库密码
 - 必填: 当备份mysql数据库时必填
 
-#### GIT相关
+### GIT相关
 当指定参数-g,或者--push2git时,脚本会把备份后的文件传到指定的git地址,此时需要指定以下参数
 
 注意, 当使用cron自动运行此脚本时, git无法获取到当前的ssh-keygen,而手动运行脚本时则正常,这是因为cron是以root用户身份运行脚本,而ssh-key保存在当前用户(可能不是root)下,
@@ -149,23 +159,23 @@ git:
 - 在脚本中指定用户的用户名 密码 邮箱
 - 在root下生成ssk-keygen,并添加到git服务器
 
-##### -e | --git_user_name [name]
+#### -e | --git_user_name [name]
 - 作用: 指定git用户名
 - 必填: 当使用https协议时必填
 
-##### -w | --git_user_pwd [pwd]
+#### -w | --git_user_pwd [pwd]
 - 作用: 指定git密码
 - 必填: 当使用https协议时必填
 
-##### -i | --git_user_email [email]
+#### -i | --git_user_email [email]
 - 作用: 指定git邮箱
 - 必填: 当使用https协议时必填
 
-##### -r | --git_remote [remote]
+#### -r | --git_remote [remote]
 - 作用: 指定git地址
 - 必填: 开启备份时必填
 
-##### -b | --git_branch [branch]
+#### -b | --git_branch [branch]
 - 作用: 指定git分支
 - 默认值: master
 

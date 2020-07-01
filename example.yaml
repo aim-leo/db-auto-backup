@@ -11,7 +11,7 @@ gzip: true
 git:
   user:
     name: aim-leo
-    email: luozewei123@qq.com
-    pwd: lzw20075877016
+    email: you-email@qq.com
+    pwd: 12345
   remote: gitee.com/aim-leo/codegeek-db-backup.git
   branch: master

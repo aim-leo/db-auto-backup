@@ -294,6 +294,6 @@ Please check whether the file_name is specified by mistake, because the script n
 
 It is theoretically supported, but it is not recommended to do so, it is best to export a folder and a git address in a database
 
-#### Why do I report permission errors when I run the git command in a directory everywhere?
+### Why do I report permission errors when I run the git command in a export directory?
 
 By default, cron uses the root user to run commands. When the program is run for the first time, the program pulls the files of the remote branch, then the permissions of the directory are the highest, and ordinary users cannot operate. Please use sudo to run
